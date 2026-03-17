@@ -1,0 +1,195 @@
+<html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>WELCOME TO MAXO</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f8;
+            padding: 20px;
+        }
+        
+        .welcome {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .box {
+            border: 2px solid black;
+            padding: 10px;
+            width: fit-content;
+            margin: auto;
+            margin-bottom: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            background: white;
+            padding: 20px;
+            margin: auto;
+            border-radius: 5px;
+        }
+        
+        textarea,
+        input,
+        button {
+            width: 100%;
+            margin: 8px 0;
+            padding: 8px;
+        }
+        
+        button {
+            background: blue;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        table,
+        th,
+        td {
+            border: 1px solid black;
+            text-align: center;
+            padding: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1 class="welcome">WELCOME TO MAXO</h1>
+
+    <div class="box">
+        <label>
+<input type="radio" name="tool" checked onchange="showTool('plagiarism')">
+Plagiarism Checker
+</label> &nbsp;&nbsp;
+        <label>
+<input type="radio" name="tool" onchange="showTool('resume')">
+Resume Ranker
+</label>
+    </div>
+
+    <div class="container" id="plagiarism">
+        <h2>Plagiarism Checker</h2>
+        <input type="file" accept=".pdf,.txt" onchange="loadPlagPDF(event)">
+        <textarea id="t1" placeholder="Text 1"></textarea>
+        <textarea id="t2" placeholder="Text 2"></textarea>
+        <button onclick="checkPlagiarism()">Check</button>
+        <div id="pResult"></div>
+    </div>
+
+    <div class="container hidden" id="resume">
+        <h2>Resume Ranker</h2>
+        <input type="file" multiple accept=".pdf" onchange="loadResumes(event)">
+        <input type="number" id="minCpi" placeholder="Minimum CPI">
+        <input type="text" id="skill" placeholder="Required Skill">
+        <button onclick="rank()">Rank Resumes</button>
+
+        <table>
+            <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Mobile</th>
+                <th>CPI</th>
+            </tr>
+            <tbody id="rResult"></tbody>
+        </table>
+    </div>
+
+    <script>
+        function showTool(id) {
+            document.getElementById("plagiarism").classList.add("hidden");
+            document.getElementById("resume").classList.add("hidden");
+            document.getElementById(id).classList.remove("hidden");
+        }
+
+        async function readPDF(file) {
+            let reader = new FileReader();
+            return new Promise(resolve => {
+                reader.onload = async function() {
+                    let pdf = await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
+                    let text = "";
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        let page = await pdf.getPage(i);
+                        let content = await page.getTextContent();
+                        text += content.items.map(x => x.str).join(" ");
+                    }
+                    resolve(text);
+                }
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function loadPlagPDF(e) {
+            let text = await readPDF(e.target.files[0]);
+            document.getElementById("t1").value = text;
+        }
+
+        function checkPlagiarism() {
+            let a = document.getElementById("t1").value.split(" ");
+            let b = document.getElementById("t2").value.split(" ");
+            let same = a.filter(w => b.includes(w)).length;
+            let percent = ((same / a.length) * 100).toFixed(2);
+            document.getElementById("pResult").innerHTML = "Similarity: " + percent + "%";
+        }
+
+        let resumes = [];
+
+        async function loadResumes(e) {
+            resumes = [];
+            for (let file of e.target.files) {
+                let text = await readPDF(file);
+                let emailMatch = text.match(/\S+@\S+/);
+                let mobileMatch = text.match(/\+91[- ]?\d{10}/);
+                let cpiMatch = text.match(/(CGPA|CPI)[^\d]*(\d+\.\d+)/i);
+
+                resumes.push({
+                    name: text.trim().split(" ")[0],
+                    email: emailMatch ? emailMatch[0] : "N/A",
+                    mobile: mobileMatch ? mobileMatch[0] : "N/A",
+                    cpi: cpiMatch ? parseFloat(cpiMatch[2]) : 0,
+                    skills: text.toLowerCase()
+                });
+            }
+            alert("Resumes loaded");
+        }
+
+        function rank() {
+            let min = document.getElementById("minCpi").value || 0;
+            let skill = document.getElementById("skill").value.toLowerCase();
+            let list = resumes.filter(r => r.cpi >= min && (skill === "" || r.skills.includes(skill)));
+            list.sort((a, b) => b.cpi - a.cpi);
+
+            document.getElementById("rResult").innerHTML = list.map((r, i) => `
+    <tr>
+        <td>${i+1}</td>
+        <td>${r.name}</td>
+        <td>${r.email}</td>
+        <td>${r.mobile}</td>
+        <td>${r.cpi}</td>
+    </tr>`).join("");
+        }
+    </script>
+
+</body>
+
+</html>
